@@ -34,7 +34,7 @@ select,input,textarea{width:100%;border:1px solid #d4dfd7;border-radius:10px;pad
     <nav aria-label="Navegação principal">
       <button class="active" data-go="inicio">Início</button>
       <button data-go="catalogo">Produtos e ideias</button>
-      <button data-go="conta">Minha conta</button><button data-go="divulgar">Divulgar minha ideia</button>
+      <button data-go="admin">Administração</button><button data-go="divulgar">Divulgar minha ideia</button>
     </nav>
   </div>
 </header>
@@ -47,7 +47,7 @@ select,input,textarea{width:100%;border:1px solid #d4dfd7;border-radius:10px;pad
     <button class="btn" style="background:#ffffff20;color:white;border:1px solid #ffffff55;margin-left:8px" data-go="divulgar">Divulgar minha ideia</button>
   </div>
 </section>
-<div id="setupWarning" class="setup-warning" hidden>⚙️ Site ainda não configurado. Para ativar contas e anúncios compartilhados, preencha a URL e a chave pública do Supabase no arquivo <strong>config.js</strong> e execute o SQL incluído no pacote.</div><main>
+<div id="setupNotice" class="setup-warning" style="margin:15px auto" hidden>⚙️ Verifique o arquivo config.js e execute setup_supabase.sql no Supabase.</div><main>
   <section class="section" id="catalogo">
     <div class="section-head">
       <h2>Nosso catálogo</h2>
@@ -60,7 +60,7 @@ select,input,textarea{width:100%;border:1px solid #d4dfd7;border-radius:10px;pad
     <div class="filters" id="filters" aria-label="Filtrar por categoria"></div>
     <div class="grid" id="products"></div>
   </section>
-  <section class="section" id="conta"><div class="section-head"><h2>Minha conta</h2><p>Entre para publicar e gerenciar somente seus anúncios.</p></div><div class="form-card" style="max-width:550px;margin:auto"><p id="sessionStatus">Entre ou crie sua conta para publicar.</p><form id="authForm"><div class="field"><label for="email">E-mail</label><input id="email" type="email" required autocomplete="email"></div><div class="field"><label for="password">Senha (mínimo 6 caracteres)</label><input id="password" type="password" minlength="6" required autocomplete="current-password"></div><div class="form-actions"><button type="button" class="btn btn-green" id="signIn">Entrar</button><button type="button" class="btn btn-outline" id="signUp">Criar conta</button><button type="button" class="btn btn-outline" id="signOut" hidden>Sair</button></div></form><p id="authMessage" role="status"></p></div></section><section class="section" id="divulgar">
+  <section class="section" id="divulgar">
     <div class="section-head">
       <h2>Divulgue sua ideia</h2>
       <p>Tem um talento, produto ou serviço? Conte para a comunidade!</p>
@@ -75,11 +75,11 @@ select,input,textarea{width:100%;border:1px solid #d4dfd7;border-radius:10px;pad
           <li>Mostre sua ideia para outras pessoas.</li>
           <li>Ajude a fortalecer os negócios locais.</li>
         </ul>
-        <p><strong>Segurança:</strong> somente a conta que publicou um anúncio pode editá-lo ou excluí-lo. O sistema precisa estar conectado ao Supabase para funcionar.</p>
+        <p><strong>Segurança:</strong> cada anúncio recebe um código secreto. Guarde-o para editar ou excluir. O administrador pode moderar todas as publicações.</p>
       </aside>
       <div class="form-card">
         <h3>Cadastro de ideia ou negócio</h3>
-        <p>Entre na sua conta para publicar seus produtos no catálogo compartilhado.</p>
+        <p>Publique sem cadastro. Guarde o código secreto mostrado depois da publicação.</p>
         <div class="notice" id="notice" role="status"></div>
         <form id="ideaForm"><input type="hidden" id="editId" value="">
           <div class="field"><label for="name">Nome do negócio ou da ideia *</label><input id="name" name="name" placeholder="Ex.: Doces da Ana" maxlength="70" required></div>
@@ -99,35 +99,37 @@ select,input,textarea{width:100%;border:1px solid #d4dfd7;border-radius:10px;pad
       </div>
     </div>
   </section>
-</main>
+<section class="section" id="admin"><div class="section-head"><h2>Administração</h2><p>Acesso exclusivo do responsável pelo projeto.</p></div><div class="form-card" style="max-width:620px;margin:auto"><div id="adminLogin"><div class="field"><label for="adminEmail">E-mail do administrador</label><input id="adminEmail" type="email" autocomplete="username"></div><div class="field"><label for="adminPassword">Senha</label><input id="adminPassword" type="password" autocomplete="current-password"></div><button type="button" class="btn btn-green" id="adminEnter">Entrar</button></div><div id="adminPanel" hidden><p>Você pode editar ou excluir qualquer anúncio.</p><button type="button" class="btn btn-outline" id="adminExit">Sair</button><div id="adminList" style="margin-top:15px"></div></div><p id="adminMessage" role="status"></p></div></section></main>
 <footer class="footer"><strong>✦ Jovens Empreendedores</strong><p>Valorizando talentos, compartilhando ideias e fortalecendo a comunidade de Mãe do Rio, Pará.<br>Projeto escolar de incentivo ao empreendedorismo juvenil.</p></footer>
 <div class="toast" id="toast" role="status"></div>
 <script src="config.js"></script>
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 const config=window.SITE_CONFIG||{};
-const ready=!!(config.supabaseUrl&&config.supabaseAnonKey&&!config.supabaseUrl.includes('COLE_'));
+const ready=Boolean(config.supabaseUrl&&config.supabaseAnonKey&&!config.supabaseUrl.includes('COLE_'));
 const db=ready?createClient(config.supabaseUrl,config.supabaseAnonKey):null;
-const categories=['Todas','Alimentação','Moda e acessórios','Beleza','Artesanato','Tecnologia','Serviços','Ideia inovadora','Outros'];
-let user=null,items=[],activeCategory='Todas';
 const $=id=>document.getElementById(id);
-function safe(s=''){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function ico(cat){return ({'Alimentação':'🍰','Moda e acessórios':'👕','Beleza':'✨','Artesanato':'🧵','Tecnologia':'💻','Serviços':'🛠️','Ideia inovadora':'💡'})[cat]||'🌱'}
-function msg(s){$('authMessage').textContent=s}
-function toast(s){$('toast').textContent=s;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
-function renderFilters(){$('filters').innerHTML=categories.map(c=>`<button class="chip ${activeCategory===c?'active':''}" data-cat="${safe(c)}">${safe(c)}</button>`).join('')}
-function contactUrl(s){const d=String(s).replace(/\D/g,'');if(d.length>=10&&d.length<=13)return 'https://wa.me/'+(d.length<=11?'55':'')+d;return /^\S+@\S+\.\S+$/.test(s)?'mailto:'+encodeURIComponent(s):''}
-function render(){const q=$('search').value.toLocaleLowerCase('pt-BR');const visible=items.filter(p=>(activeCategory==='Todas'||p.category===activeCategory)&&[p.name,p.owner,p.description,p.category].some(x=>String(x||'').toLocaleLowerCase('pt-BR').includes(q)));
-$('products').innerHTML=visible.length?visible.map(p=>{const own=user&&p.user_id===user.id;const link=p.contact?contactUrl(p.contact):'';return `<article class="business-card"><div class="card-art">${p.image?`<img src="${safe(p.image)}" alt="Imagem do anúncio" loading="lazy" onerror="this.remove()">`:ico(p.category)}<span class="category">${safe(p.category)}</span></div><div class="card-body"><h3>${safe(p.name)}</h3><p>${safe(p.description)}</p><div class="card-bottom"><span class="owner">Por ${safe(p.owner)}${p.price?'<br><strong>'+safe(p.price)+'</strong>':''}</span>${link?`<a class="btn btn-green contact" href="${safe(link)}" target="_blank" rel="noopener noreferrer">Contato ↗</a>`:''}</div>${own?`<div class="manage-actions"><button class="edit-btn" data-edit="${safe(p.id)}">✏️ Editar</button><button class="delete-btn" data-delete="${safe(p.id)}">🗑️ Excluir</button></div>`:''}</div></article>`}).join(''):'<div class="empty">Nenhum produto encontrado. Seja o primeiro a divulgar sua ideia!</div>'}
-async function refresh(){if(!db)return;const {data,error}=await db.from('products').select('id,user_id,name,owner,category,description,price,contact,image,created_at').order('created_at',{ascending:false}).limit(300);if(error){toast('Erro ao carregar catálogo: '+error.message);return}items=data||[];render()}
-function updateAuth(){$('sessionStatus').textContent=user?'Conectado como '+user.email:'Entre ou crie sua conta para publicar e gerenciar anúncios.';$('authForm').querySelectorAll('input').forEach(el=>el.disabled=!!user);$('signIn').hidden=!!user;$('signUp').hidden=!!user;$('signOut').hidden=!user;$('ideaForm').querySelectorAll('input,textarea,select,button').forEach(el=>el.disabled=!user);$('publishBtn').textContent='Publicar no catálogo';render()}
-async function auth(action){if(!db)return msg('Configure o Supabase antes de criar contas.');const email=$('email').value.trim(),password=$('password').value;if(!email||password.length<6)return msg('Informe e-mail e senha com pelo menos 6 caracteres.');const {data,error}=action==='up'?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});if(error)return msg('Não foi possível continuar: '+error.message);msg(action==='up'&&!data.session?'Conta criada! Verifique seu e-mail para confirmar o cadastro.':'Você entrou na sua conta!')}
-$('signIn').addEventListener('click',()=>auth('in'));$('signUp').addEventListener('click',()=>auth('up'));$('signOut').addEventListener('click',async()=>{if(db)await db.auth.signOut();msg('Você saiu da conta.')});
-document.addEventListener('click',async e=>{const go=e.target.closest('[data-go]');if(go){$(go.dataset.go)?.scrollIntoView({behavior:'smooth'});document.querySelectorAll('nav [data-go]').forEach(b=>b.classList.toggle('active',b.dataset.go===go.dataset.go))}const chip=e.target.closest('[data-cat]');if(chip){activeCategory=chip.dataset.cat;renderFilters();render()}
-const del=e.target.closest('[data-delete]');if(del){const p=items.find(x=>x.id===del.dataset.delete);if(!p||!user||p.user_id!==user.id)return;if(!confirm('Tem certeza que deseja excluir "'+p.name+'"? Esta ação não pode ser desfeita.'))return;const {error}=await db.from('products').delete().eq('id',p.id).eq('user_id',user.id);if(error)toast('Não foi possível excluir: '+error.message);else{toast('Produto excluído com sucesso.');await refresh()}}
-const edit=e.target.closest('[data-edit]');if(edit){const p=items.find(x=>x.id===edit.dataset.edit);if(!p||!user||p.user_id!==user.id)return;for(const key of ['name','owner','category','description','price','contact','image'])$(key).value=p[key]||'';$('editId').value=p.id;$('publishBtn').textContent='Salvar alterações';$('divulgar').scrollIntoView({behavior:'smooth'})}});
+const categories=['Todas','Alimentação','Moda e acessórios','Beleza','Artesanato','Tecnologia','Serviços','Ideia inovadora','Outros'];
+let items=[],activeCategory='Todas',editId='',editCode='',admin=false;
+function safe(v=''){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),4500)}
+function code(){const a=new Uint8Array(32);crypto.getRandomValues(a);return Array.from(a,x=>x.toString(16).padStart(2,'0')).join('').toUpperCase()}
+function ico(c){return ({'Alimentação':'🍰','Moda e acessórios':'👕','Beleza':'✨','Artesanato':'🧵','Tecnologia':'💻','Serviços':'🛠️','Ideia inovadora':'💡'})[c]||'🌱'}
+function contactUrl(s){const d=String(s||'').replace(/\D/g,'');if(d.length>=10&&d.length<=13)return 'https://wa.me/'+(d.length<=11?'55':'')+d;return /^\S+@\S+\.\S+$/.test(s||'')?'mailto:'+encodeURIComponent(s):''}
+function renderFilters(){$('filters').innerHTML=categories.map(c=>`<button class="chip ${c===activeCategory?'active':''}" data-cat="${safe(c)}">${safe(c)}</button>`).join('')}
+function render(){const q=$('search').value.toLocaleLowerCase('pt-BR');const filtered=items.filter(p=>(activeCategory==='Todas'||p.category===activeCategory)&&[p.name,p.owner,p.description,p.category].some(x=>String(x||'').toLocaleLowerCase('pt-BR').includes(q)));$('products').innerHTML=filtered.length?filtered.map(p=>{const link=contactUrl(p.contact);return `<article class="business-card"><div class="card-art">${p.image?`<img src="${safe(p.image)}" alt="Imagem do anúncio" loading="lazy" onerror="this.remove()">`:ico(p.category)}<span class="category">${safe(p.category)}</span></div><div class="card-body"><h3>${safe(p.name)}</h3><p>${safe(p.description)}</p><div class="card-bottom"><span class="owner">Por ${safe(p.owner)}${p.price?'<br><strong>'+safe(p.price)+'</strong>':''}</span>${link?`<a class="btn btn-green contact" href="${safe(link)}" target="_blank" rel="noopener noreferrer">Contato ↗</a>`:''}</div><div class="manage-actions"><button class="edit-btn" data-edit="${safe(p.id)}">✏️ Editar com código</button><button class="delete-btn" data-delete="${safe(p.id)}">🗑️ Excluir com código</button></div></div></article>`}).join(''):'<div class="empty">Nenhum produto encontrado. Seja o primeiro a divulgar sua ideia!</div>';renderAdmin()}
+function renderAdmin(){if(!admin)return;$('adminList').innerHTML=items.map(p=>`<div style="padding:12px;border-bottom:1px solid #ddd"><strong>${safe(p.name)}</strong> — ${safe(p.owner)} <div class="manage-actions"><button class="edit-btn" data-admin-edit="${safe(p.id)}">Editar</button><button class="delete-btn" data-admin-delete="${safe(p.id)}">Excluir</button></div></div>`).join('')||'Nenhum anúncio.'}
+async function refresh(){if(!db)return;const {data,error}=await db.rpc('je_list');if(error){toast('Erro no banco: '+error.message);return}items=data||[];render()}
+function beginEdit(p,c){for(const k of ['name','owner','category','description','price','contact','image'])$(k).value=p[k]||'';editId=p.id;editCode=c||'';$('publishBtn').textContent='Salvar alterações';$('divulgar').scrollIntoView({behavior:'smooth'})}
+async function manage(action,id,c,payload={}){if(!db){toast('Site ainda não conectado ao Supabase');return false}const {error}=await db.rpc('je_manage',{p_action:action,p_id:id||null,p_code:c||null,p_data:payload});if(error){toast('Não foi possível: '+error.message);return false}await refresh();return true}
+function promptCode(){const c=prompt('Cole o código secreto deste anúncio:');return c===null?null:c.trim().toUpperCase()}
+$('adminEnter').onclick=async()=>{if(!db)return toast('Configure o Supabase');const email=$('adminEmail').value.trim(),password=$('adminPassword').value;const {error}=await db.auth.signInWithPassword({email,password});if(error)return $('adminMessage').textContent='Falha no login: '+error.message;await checkAdmin();if(!admin){await db.auth.signOut();$('adminMessage').textContent='Esta conta não tem permissão de administrador.'}};
+$('adminExit').onclick=async()=>{await db.auth.signOut();admin=false;updateAdmin()};
+function updateAdmin(){$('adminLogin').hidden=admin;$('adminPanel').hidden=!admin;renderAdmin()}
+async function checkAdmin(){if(!db)return;const {data:{user}}=await db.auth.getUser();if(!user){admin=false;updateAdmin();return}const {data,error}=await db.rpc('je_is_admin');admin=!error&&data===true;updateAdmin()}
+document.addEventListener('click',async e=>{const go=e.target.closest('[data-go]');if(go)$(go.dataset.go)?.scrollIntoView({behavior:'smooth'});const cat=e.target.closest('[data-cat]');if(cat){activeCategory=cat.dataset.cat;renderFilters();render()}const del=e.target.closest('[data-delete]');if(del){const c=admin?null:promptCode();if(!admin&&c===null)return;if(confirm('Tem certeza que deseja excluir este anúncio?')){if(await manage('delete',del.dataset.delete,c))toast('Anúncio excluído')}}const edit=e.target.closest('[data-edit]');if(edit){const p=items.find(x=>x.id===edit.dataset.edit);if(!p)return;const c=admin?'':promptCode();if(c!==null)beginEdit(p,c)}const ad=e.target.closest('[data-admin-delete]');if(ad&&admin&&confirm('Excluir este anúncio?'))await manage('delete',ad.dataset.adminDelete,null);const ae=e.target.closest('[data-admin-edit]');if(ae&&admin){const p=items.find(x=>x.id===ae.dataset.adminEdit);if(p)beginEdit(p,'')}});
 $('search').addEventListener('input',render);
-$('ideaForm').addEventListener('submit',async e=>{e.preventDefault();if(!db||!user)return toast('Entre na sua conta para publicar.');const f=e.currentTarget;const payload=Object.fromEntries(new FormData(f).entries());const editId=$('editId').value;delete payload.editId;for(const k of Object.keys(payload))payload[k]=payload[k].trim();if(!payload.name||!payload.owner||!payload.category||!payload.description)return toast('Preencha os campos obrigatórios.');if(payload.image){try{const u=new URL(payload.image);if(!['https:','http:'].includes(u.protocol))throw Error()}catch{return toast('Use um link válido de imagem.')}}let response;if(editId){response=await db.from('products').update(payload).eq('id',editId).eq('user_id',user.id)}else{response=await db.from('products').insert({...payload,user_id:user.id})}if(response.error)return toast('Não foi possível salvar: '+response.error.message);f.reset();$('editId').value='';$('publishBtn').textContent='Publicar no catálogo';toast(editId?'Anúncio atualizado!':'Anúncio publicado!');await refresh();$('catalogo').scrollIntoView({behavior:'smooth'})});
-$('ideaForm').addEventListener('reset',()=>{$('editId').value='';$('publishBtn').textContent='Publicar no catálogo'});
-renderFilters();render();if(!ready){$('setupWarning').hidden=false;updateAuth();}else{db.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;updateAuth()});db.auth.getUser().then(({data})=>{user=data.user||null;updateAuth()});refresh()}
+$('ideaForm').addEventListener('submit',async e=>{e.preventDefault();const f=e.currentTarget;const payload=Object.fromEntries(new FormData(f).entries());delete payload.editId;for(const k in payload)payload[k]=payload[k].trim();if(!payload.name||!payload.owner||!payload.category||!payload.description)return toast('Preencha os campos obrigatórios.');if(payload.image){try{const u=new URL(payload.image);if(!['https:','http:'].includes(u.protocol))throw Error()}catch{return toast('Use um link válido de imagem.')}}if(editId){if(await manage('update',editId,editCode,payload)){toast('Anúncio atualizado!');editId='';editCode='';f.reset();$('publishBtn').textContent='Publicar no catálogo'}}else{const secret=code();if(!db)return toast('Configure o Supabase');const {error}=await db.rpc('je_manage',{p_action:'create',p_id:null,p_code:secret,p_data:payload});if(error)return toast('Não foi possível publicar: '+error.message);const box=$('preview');box.classList.add('show');box.innerHTML=`<h4>✅ Anúncio publicado!</h4><p><strong>Guarde este código secreto.</strong> Sem ele você não poderá editar ou excluir seu anúncio.</p><div style="font-size:1.05rem;font-weight:bold;word-break:break-all" id="generatedCode">${secret}</div><button class="btn btn-outline" type="button" id="copyCode" style="margin-top:12px">Copiar meu código</button>`;$('copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(secret);toast('Código copiado!')}catch{toast('Selecione e copie o código acima')}};f.reset();toast('Anúncio publicado para todos!');await refresh()}});
+$('ideaForm').addEventListener('reset',()=>{editId='';editCode='';$('publishBtn').textContent='Publicar no catálogo'});
+renderFilters();render();if(!ready){$('setupNotice').hidden=false;toast('Falta configurar o arquivo config.js')}else{refresh();checkAdmin();db.auth.onAuthStateChange(()=>{setTimeout(checkAdmin,0)})}
 </script></body></html>
